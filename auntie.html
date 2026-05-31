@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#d84315">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="晚餐管家">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>晚餐管家</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: "PingFang SC","Microsoft YaHei","Helvetica Neue",sans-serif; background:#fdf6f0; color:#3e2723; min-height:100vh; padding-bottom:40px; }
+.header { background:linear-gradient(135deg,#d84315,#bf360c); color:#fff; padding:16px 20px; text-align:center; box-shadow:0 2px 12px rgba(0,0,0,.15); position:sticky; top:0; z-index:100; }
+.header h1 { font-size:22px; font-weight:600; }
+.header .sub { font-size:13px; opacity:.85; margin-top:2px; }
+.header .addr { font-size:11px; opacity:.7; margin-top:2px; }
+
+.container { max-width:800px; margin:0 auto; padding:16px; }
+
+/* Week Navigation */
+.week-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.week-header button { width:32px; height:32px; border-radius:50%; border:2px solid #e0d5cc; background:#fff; cursor:pointer; font-size:16px; color:#d84315; transition:all .2s; display:flex; align-items:center; justify-content:center; }
+.week-header button:hover { background:#d84315; color:#fff; border-color:#d84315; }
+.week-header button:disabled { opacity:.3; cursor:default; pointer-events:none; }
+.week-header .week-label { font-size:13px; font-weight:600; color:#8d6e63; }
+
+/* Week Tabs */
+.week-nav { display:flex; gap:4px; margin-bottom:16px; overflow-x:auto; padding-bottom:4px; }
+.week-nav .day { flex:0 0 auto; min-width:72px; padding:10px 8px; border-radius:12px; text-align:center; cursor:pointer; background:#fff; border:2px solid #e0d5cc; transition:all .2s; }
+.week-nav .day:hover { border-color:#d84315; }
+.week-nav .day.active { background:#d84315; color:#fff; border-color:#d84315; }
+.week-nav .day.active .dow, .week-nav .day.active .label { color:rgba(255,255,255,.8); }
+.week-nav .day.today { box-shadow:0 0 0 3px rgba(216,67,21,.3); }
+.week-nav .day.eatout { background:#f5f5f5; color:#999; border-style:dashed; }
+.week-nav .day .dow { font-size:11px; opacity:.7; }
+.week-nav .day .date { font-size:14px; font-weight:600; }
+.week-nav .day .label { font-size:10px; }
+
+/* Day Detail */
+.day-detail { background:#fff; border-radius:16px; padding:20px; margin-bottom:16px; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+.day-detail .day-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:8px; }
+.day-detail h2 { font-size:18px; color:#bf360c; display:flex; align-items:center; gap:8px; }
+.day-detail h2 .badge { font-size:12px; background:#ffcc02; color:#3e2723; padding:2px 8px; border-radius:10px; }
+.btn-refresh { padding:6px 14px; border-radius:14px; border:1px solid #d84315; background:#fff; color:#d84315; cursor:pointer; font-size:12px; transition:all .2s; white-space:nowrap; }
+.btn-refresh:hover { background:#d84315; color:#fff; }
+.eatout-card { text-align:center; padding:40px 20px; color:#999; }
+.eatout-card .icon { font-size:48px; margin-bottom:12px; }
+
+/* Dish Card */
+.dish-card { display:flex; gap:12px; padding:14px; margin-bottom:10px; background:#fdfaf7; border-radius:12px; border:1px solid #f0e8e0; align-items:flex-start; }
+.dish-card .cat-tag { display:inline-block; font-size:10px; padding:2px 8px; border-radius:8px; color:#fff; font-weight:600; margin-bottom:6px; }
+.cat-tag.meat { background:#d84315; }
+.cat-tag.half { background:#ef6c00; }
+.cat-tag.veg { background:#2e7d32; }
+.cat-tag.soup { background:#0277bd; }
+.dish-card h3 { font-size:15px; margin-bottom:4px; }
+.dish-card .steps { font-size:12px; color:#666; line-height:1.6; }
+.dish-card .video-link { display:inline-block; margin-top:6px; font-size:12px; color:#d84315; text-decoration:none; }
+.dish-card .video-link:hover { text-decoration:underline; }
+.dish-card .actions { display:flex; gap:6px; margin-top:8px; }
+.dish-card .actions button { padding:4px 14px; border-radius:14px; border:1px solid #ddd; background:#fff; cursor:pointer; font-size:12px; transition:all .2s; display:flex; align-items:center; gap:4px; }
+.dish-card .actions button:hover { transform:scale(1.05); }
+.dish-card .actions .btn-like { border-color:#4caf50; color:#4caf50; }
+.dish-card .actions .btn-like.liked { background:#4caf50; color:#fff; }
+.dish-card .actions .btn-dislike { border-color:#f44336; color:#f44336; }
+.dish-card .actions .btn-dislike.disliked { background:#f44336; color:#fff; }
+.dish-card .actions .btn-swap { border-color:#ff9800; color:#ff9800; }
+.dish-card .actions .btn-swap:hover { background:#ff9800; color:#fff; }
+
+/* Add Dish Modal */
+.modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.5); z-index:200; justify-content:center; align-items:center; padding:20px; }
+.modal-overlay.show { display:flex; }
+.modal { background:#fff; border-radius:16px; padding:24px; width:100%; max-width:440px; max-height:85vh; overflow-y:auto; }
+.modal h3 { font-size:18px; color:#bf360c; margin-bottom:16px; }
+.form-group { margin-bottom:14px; }
+.form-group label { display:block; font-size:13px; font-weight:600; color:#5d4037; margin-bottom:4px; }
+.form-group input, .form-group textarea, .form-group select { width:100%; padding:8px 12px; border:1px solid #e0d5cc; border-radius:8px; font-size:13px; font-family:inherit; resize:vertical; }
+.form-group textarea { min-height:60px; }
+.form-group .hint { font-size:11px; color:#999; margin-top:2px; }
+.modal .btn-row { display:flex; gap:8px; margin-top:18px; }
+.modal .btn-row button { flex:1; padding:10px; border-radius:10px; border:none; cursor:pointer; font-size:14px; font-weight:600; }
+.modal .btn-save { background:#d84315; color:#fff; }
+.modal .btn-cancel { background:#f5f0eb; color:#8d6e63; }
+.ingredient-row { display:flex; gap:6px; margin-bottom:6px; align-items:center; }
+.ingredient-row input { flex:1; }
+.ingredient-row select { width:100px; }
+.ingredient-row .btn-remove-ing { padding:4px 8px; border-radius:6px; border:1px solid #f44336; background:#fff; color:#f44336; cursor:pointer; font-size:11px; }
+.btn-add-ing { padding:4px 12px; border-radius:10px; border:1px dashed #d84315; background:#fff; color:#d84315; cursor:pointer; font-size:12px; margin-top:4px; }
+
+/* Header add dish button */
+.header-actions { display:flex; gap:8px; justify-content:center; margin-top:6px; }
+.btn-add-dish { padding:4px 16px; border-radius:14px; border:1px solid rgba(255,255,255,.6); background:rgba(255,255,255,.15); color:#fff; cursor:pointer; font-size:12px; transition:all .2s; }
+.btn-add-dish:hover { background:rgba(255,255,255,.3); }
+
+/* Shopping List */
+.shopping-list { background:#fff; border-radius:16px; padding:20px; margin-bottom:16px; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+.shopping-list h2 { font-size:18px; margin-bottom:16px; color:#bf360c; }
+.shopping-list .app-section { margin-bottom:16px; }
+.shopping-list .app-title { font-size:14px; font-weight:600; color:#fff; padding:6px 14px; border-radius:8px; display:inline-block; margin-bottom:10px; }
+.app-title.dingdong { background:#43a047; }
+.app-title.meituan { background:#ffb300; color:#3e2723; }
+.shopping-list ul { list-style:none; }
+.shopping-list li { padding:8px 0; border-bottom:1px solid #f5f0eb; font-size:13px; display:flex; align-items:center; gap:8px; }
+.shopping-list li:last-child { border-bottom:none; }
+.shopping-list li .qty { color:#999; font-size:11px; white-space:nowrap; }
+.cat-group { margin-bottom:12px; }
+.cat-label { font-size:12px; font-weight:600; color:#8d6e63; padding:4px 0 4px 4px; border-bottom:1px dashed #f0e8e0; margin-bottom:4px; }
+.shopping-list .note { font-size:11px; color:#999; margin-top:8px; font-style:italic; }
+.no-data { text-align:center; padding:30px; color:#999; }
+
+/* Preferences */
+.prefs-section { background:#fff; border-radius:16px; padding:20px; margin-bottom:16px; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+.prefs-section h2 { font-size:16px; margin-bottom:12px; }
+.pref-tags { display:flex; flex-wrap:wrap; gap:6px; }
+.pref-tag { font-size:12px; padding:4px 12px; border-radius:12px; }
+.pref-tag.liked { background:#e8f5e9; color:#2e7d32; }
+.pref-tag.disliked { background:#ffebee; color:#c62828; text-decoration:line-through; }
+
+.footer { text-align:center; padding:20px; font-size:11px; color:#bbb; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>晚餐管家</h1>
+  <div class="sub">3大2小 · 1荤1半1素1汤 · 周三/六外出就餐</div>
+</div>
+
+<div class="container">
+  <div class="week-header">
+    <button id="btnPrevWeek" title="上一周">◀</button>
+    <span class="week-label" id="weekLabel"></span>
+    <button id="btnNextWeek" title="下一周">▶</button>
+  </div>
+  <div class="week-nav" id="weekNav"></div>
+  <div class="day-detail" id="dayDetail"></div>
+  <div class="shopping-list" id="shoppingList"></div>
+  <div class="prefs-section" id="prefsSection"></div>
+</div>
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3 id="modalTitle">＋ 添加新菜</h3>
+    <div class="form-group">
+      <label>菜品名称</label>
+      <input type="text" id="dishName" placeholder="如：糖醋里脊">
+    </div>
+    <div class="form-group">
+      <label>分类</label>
+      <select id="dishCat">
+        <option value="meat" selected>荤菜</option>
+        <option value="halfMeat">半荤半素</option>
+        <option value="vegetable">素菜</option>
+        <option value="soup">汤</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>烹饪步骤</label>
+      <textarea id="dishSteps" placeholder="1.第一步；2.第二步；3..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>视频教程链接（选填）</label>
+      <input type="text" id="dishVideo" placeholder="https://search.bilibili.com/all?keyword=xxx">
+    </div>
+    <div class="form-group">
+      <label>食材清单</label>
+      <div id="ingredientRows">
+        <div class="ingredient-row">
+          <input type="text" placeholder="食材名" class="ing-name">
+          <input type="text" placeholder="用量" class="ing-qty" style="width:100px">
+          <select class="ing-app"><option value="dingdong">叮咚</option><option value="meituan">美团</option></select>
+          <button class="btn-remove-ing" onclick="this.parentElement.remove()">✕</button>
+        </div>
+      </div>
+      <button class="btn-add-ing" id="btnAddIng">＋ 添加食材</button>
+      <div class="hint">默认在叮咚买菜购买，可切换为美团</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-cancel" id="btnCancelDish">取消</button>
+      <button class="btn-save" id="btnSaveDish">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="footer">菜单自动生成 · 点击喜欢/不喜欢来调教你的专属菜谱 · 不喜欢的菜不再出现</div>
+
+<script>
+// 'owner' = 可编辑; 'auntie' = 只读
+const MODE = 'auntie';
+
+// ============ DISH DATABASE ============
+const DISHES = {
+  meat: [
+    { id:'m1', name:'红烧肉', steps:'1.五花肉切块焯水；2.炒糖色后下肉块翻炒；3.加生抽老抽料酒、八角桂皮香叶；4.加热水没过肉，小火炖40分钟；5.大火收汁至浓稠。', video:'https://search.bilibili.com/all?keyword=红烧肉', ingredients:[{name:'五花肉',qty:'500g',app:'dingdong'},{name:'冰糖',qty:'30g',app:'dingdong'},{name:'生抽',qty:'适量',app:'dingdong'},{name:'老抽',qty:'适量',app:'dingdong'},{name:'八角',qty:'2颗',app:'dingdong'},{name:'桂皮',qty:'1段',app:'dingdong'},{name:'姜',qty:'3片',app:'dingdong'}] },
+    { id:'m2', name:'糖醋排骨', steps:'1.排骨焯水沥干；2.油热煎排骨至两面金黄；3.加料酒、生抽、醋、糖（比例1:2:3:4）；4.加水没过，小火炖30分钟；5.大火收汁撒芝麻。', video:'https://search.bilibili.com/all?keyword=糖醋排骨', ingredients:[{name:'排骨',qty:'500g',app:'dingdong'},{name:'料酒',qty:'1勺',app:'dingdong'},{name:'生抽',qty:'2勺',app:'dingdong'},{name:'香醋',qty:'3勺',app:'dingdong'},{name:'白糖',qty:'4勺',app:'dingdong'},{name:'白芝麻',qty:'少许',app:'dingdong'}] },
+    { id:'m3', name:'宫保鸡丁', steps:'1.鸡胸肉切丁，加蛋清淀粉腌制；2.花生米小火炒香备用；3.热油滑炒鸡丁至变色盛出；4.炒香干辣椒花椒葱姜蒜；5.加入鸡丁和料汁（酱油醋糖淀粉水）翻炒；6.加入花生米和黄瓜丁翻匀。', video:'https://search.bilibili.com/all?keyword=宫保鸡丁', ingredients:[{name:'鸡胸肉',qty:'300g',app:'dingdong'},{name:'花生米',qty:'50g',app:'dingdong'},{name:'黄瓜',qty:'1根',app:'dingdong'},{name:'干辣椒',qty:'5个',app:'dingdong'},{name:'花椒',qty:'少许',app:'dingdong'},{name:'淀粉',qty:'适量',app:'dingdong'}] },
+    { id:'m4', name:'可乐鸡翅', steps:'1.鸡翅洗净划刀，焯水去腥；2.热油煎鸡翅至两面金黄；3.加姜片、料酒、生抽；4.倒入可乐没过鸡翅；5.中火煮15分钟；6.大火收汁至浓稠。', video:'https://search.bilibili.com/all?keyword=可乐鸡翅', ingredients:[{name:'鸡中翅',qty:'10个',app:'dingdong'},{name:'可乐',qty:'1罐',app:'meituan'},{name:'姜',qty:'3片',app:'dingdong'},{name:'料酒',qty:'1勺',app:'dingdong'},{name:'生抽',qty:'2勺',app:'dingdong'}] },
+    { id:'m5', name:'清蒸鲈鱼', steps:'1.鲈鱼洗净两面划刀；2.鱼身抹盐和料酒，放姜片葱段；3.水开后上锅蒸8-10分钟；4.倒掉盘中汤汁；5.铺上新葱丝姜丝，淋蒸鱼豉油；6.热油浇在葱丝上。', video:'https://search.bilibili.com/all?keyword=清蒸鲈鱼', ingredients:[{name:'鲈鱼',qty:'1条(约500g)',app:'dingdong'},{name:'姜',qty:'5片',app:'dingdong'},{name:'小葱',qty:'3根',app:'dingdong'},{name:'蒸鱼豉油',qty:'2勺',app:'dingdong'},{name:'料酒',qty:'1勺',app:'dingdong'}] },
+    { id:'m6', name:'葱爆牛肉', steps:'1.牛肉逆纹切薄片，加生抽淀粉油腌制15分钟；2.大葱斜切段；3.热油滑炒牛肉至变色盛出；4.炒香大葱；5.倒回牛肉，加蚝油生抽快速翻炒出锅。', video:'https://search.bilibili.com/all?keyword=葱爆牛肉', ingredients:[{name:'牛里脊',qty:'300g',app:'dingdong'},{name:'大葱',qty:'2根',app:'dingdong'},{name:'蚝油',qty:'1勺',app:'dingdong'},{name:'生抽',qty:'1勺',app:'dingdong'},{name:'淀粉',qty:'适量',app:'dingdong'}] },
+    { id:'m7', name:'土豆炖牛肉', steps:'1.牛肉切块焯水；2.热油炒香八角桂皮姜片；3.下牛肉翻炒加生抽老抽；4.加热水炖1小时；5.加土豆胡萝卜块再炖20分钟；6.加盐调味收汁。', video:'https://search.bilibili.com/all?keyword=土豆炖牛肉', ingredients:[{name:'牛腩',qty:'500g',app:'dingdong'},{name:'土豆',qty:'2个',app:'dingdong'},{name:'胡萝卜',qty:'1根',app:'dingdong'},{name:'八角',qty:'2颗',app:'dingdong'},{name:'生抽',qty:'2勺',app:'dingdong'},{name:'老抽',qty:'1勺',app:'dingdong'}] },
+    { id:'m8', name:'蒜蓉虾', steps:'1.虾开背去虾线洗净；2.大量蒜切末，一半炸至金黄；3.虾摆盘铺上生蒜和炸蒜；4.淋生抽和少许糖；5.水开后上锅蒸6分钟；6.撒葱花浇热油。', video:'https://search.bilibili.com/all?keyword=蒜蓉虾', ingredients:[{name:'基围虾',qty:'400g',app:'dingdong'},{name:'大蒜',qty:'2头',app:'dingdong'},{name:'小葱',qty:'2根',app:'dingdong'},{name:'生抽',qty:'1勺',app:'dingdong'}] },
+    { id:'m9', name:'红烧鸡块', steps:'1.鸡块焯水沥干；2.炒糖色加鸡块翻炒；3.加生抽老抽料酒、八角干辣椒；4.加热水炖30分钟；5.加青红椒块翻炒收汁。', video:'https://search.bilibili.com/all?keyword=红烧鸡块', ingredients:[{name:'三黄鸡',qty:'半只',app:'dingdong'},{name:'青椒',qty:'2个',app:'dingdong'},{name:'红椒',qty:'1个',app:'dingdong'},{name:'八角',qty:'2颗',app:'dingdong'},{name:'干辣椒',qty:'3个',app:'dingdong'},{name:'冰糖',qty:'20g',app:'dingdong'}] },
+    { id:'m10', name:'回锅肉', steps:'1.五花肉整块煮至筷子可插入；2.切薄片；3.热锅不放油煸炒肉片出油卷曲；4.加郫县豆瓣酱炒出红油；5.加蒜苗段和青椒片翻炒；6.加少许糖和生抽调味。', video:'https://search.bilibili.com/all?keyword=回锅肉', ingredients:[{name:'五花肉',qty:'400g',app:'dingdong'},{name:'蒜苗',qty:'3根',app:'dingdong'},{name:'青椒',qty:'2个',app:'dingdong'},{name:'郫县豆瓣酱',qty:'1勺',app:'dingdong'},{name:'姜',qty:'3片',app:'dingdong'}] },
+    { id:'m11', name:'啤酒鸭', steps:'1.鸭肉切块焯水；2.炒香姜蒜八角桂皮；3.下鸭肉翻炒至皮微焦；4.加生抽老抽翻炒；5.倒入一罐啤酒没过鸭肉；6.小火炖40分钟收汁。', video:'https://search.bilibili.com/all?keyword=啤酒鸭', ingredients:[{name:'鸭腿',qty:'3只',app:'dingdong'},{name:'啤酒',qty:'1罐',app:'meituan'},{name:'八角',qty:'2颗',app:'dingdong'},{name:'桂皮',qty:'1段',app:'dingdong'},{name:'姜',qty:'5片',app:'dingdong'},{name:'大蒜',qty:'5瓣',app:'dingdong'}] },
+    { id:'m12', name:'水煮肉片', steps:'1.里脊肉切薄片加蛋清淀粉腌制；2.炒香豆瓣酱和花椒干辣椒；3.加水煮开下豆芽青菜焯熟铺碗底；4.滑入肉片煮至变色连汤倒入碗中；5.撒蒜末辣椒面花椒粉；6.浇热油。', video:'https://search.bilibili.com/all?keyword=水煮肉片', ingredients:[{name:'猪里脊',qty:'300g',app:'dingdong'},{name:'豆芽',qty:'200g',app:'dingdong'},{name:'青菜',qty:'200g',app:'dingdong'},{name:'郫县豆瓣酱',qty:'2勺',app:'dingdong'},{name:'干辣椒',qty:'10个',app:'dingdong'},{name:'花椒',qty:'1勺',app:'dingdong'},{name:'辣椒面',qty:'1勺',app:'dingdong'}] },
+    { id:'m13', name:'红烧带鱼', steps:'1.带鱼段洗净沥干裹薄淀粉；2.热油煎至两面金黄盛出；3.炒香葱姜蒜八角；4.加生抽老抽料酒糖和水；5.放入带鱼小火炖10分钟；6.大火收汁撒葱花。', video:'https://search.bilibili.com/all?keyword=红烧带鱼', ingredients:[{name:'带鱼',qty:'500g',app:'dingdong'},{name:'姜',qty:'3片',app:'dingdong'},{name:'大蒜',qty:'3瓣',app:'dingdong'},{name:'小葱',qty:'2根',app:'dingdong'},{name:'生抽',qty:'2勺',app:'dingdong'},{name:'老抽',qty:'1勺',app:'dingdong'},{name:'淀粉',qty:'适量',app:'dingdong'}] },
+    { id:'m14', name:'椒盐排骨', steps:'1.排骨斩小段加料酒生抽腌制30分钟；2.裹上薄淀粉；3.油温六成炸至金黄捞出；4.油温升高复炸至酥脆；5.另起锅炒香蒜末青红椒粒；6.下排骨撒椒盐翻匀。', video:'https://search.bilibili.com/all?keyword=椒盐排骨', ingredients:[{name:'排骨',qty:'500g',app:'dingdong'},{name:'椒盐',qty:'适量',app:'dingdong'},{name:'大蒜',qty:'5瓣',app:'dingdong'},{name:'青椒',qty:'1个',app:'dingdong'},{name:'红椒',qty:'1个',app:'dingdong'},{name:'淀粉',qty:'适量',app:'dingdong'}] },
+    { id:'m15', name:'鱼香肉丝', steps:'1.猪里脊切丝加生抽淀粉腌制；2.木耳泡发切丝，胡萝卜青椒切丝；3.调鱼香汁（生抽醋糖淀粉水）；4.热油滑炒肉丝变色盛出；5.炒香豆瓣酱葱姜蒜；6.下所有食材淋汁翻炒。', video:'https://search.bilibili.com/all?keyword=鱼香肉丝', ingredients:[{name:'猪里脊',qty:'250g',app:'dingdong'},{name:'胡萝卜',qty:'1根',app:'dingdong'},{name:'青椒',qty:'1个',app:'dingdong'},{name:'干木耳',qty:'15g',app:'dingdong'},{name:'郫县豆瓣酱',qty:'1勺',app:'dingdong'},{name:'生抽',qty:'1勺',app:'dingdong'},{name:'香醋',qty:'1勺',app:'dingdong'},{name:'白糖',qty:'1勺',app:'dingdong'}] },
+  ],
+  halfMeat: [
+    { id:'h1', name:'西红柿炒鸡蛋', steps:'1.鸡蛋打散加少许盐；2.热油炒鸡蛋至凝固盛出；3.西红柿切块炒出汁；4.倒回鸡蛋翻炒；5.加糖和盐调味，撒葱花。', video:'https://search.bilibili.com/all?keyword=西红柿炒鸡蛋', ingredients:[{name:'西红柿',qty:'3个',app:'dingdong'},{name:'鸡蛋',qty:'4个',app:'dingdong'},{name:'小葱',qty:'1根',app:'dingdong'},{name:'白糖',qty:'少许',app:'dingdong'}] },
+    { id:'h2', name:'青椒肉丝', steps:'1.猪肉切丝加生抽淀粉腌制；2.青椒切丝；3.热油滑炒肉丝变色盛出；4.炒青椒至断生；5.倒回肉丝加生抽蚝油翻炒。', video:'https://search.bilibili.com/all?keyword=青椒肉丝', ingredients:[{name:'猪瘦肉',qty:'250g',app:'dingdong'},{name:'青椒',qty:'3个',app:'dingdong'},{name:'生抽',qty:'1勺',app:'dingdong'},{name:'蚝油',qty:'1勺',app:'dingdong'},{name:'淀粉',qty:'适量',app:'dingdong'}] },
+    { id:'h3', name:'肉末茄子', steps:'1.茄子切条加盐腌制挤出水；2.肉末加料酒生抽腌制；3.热油炒肉末至变色盛出；4.多放油炒茄子至软；5.加蒜末豆瓣酱炒香；6.倒回肉末加生抽糖翻炒。', video:'https://search.bilibili.com/all?keyword=肉末茄子', ingredients:[{name:'茄子',qty:'3根',app:'dingdong'},{name:'猪肉末',qty:'150g',app:'dingdong'},{name:'大蒜',qty:'5瓣',app:'dingdong'},{name:'郫县豆瓣酱',qty:'1勺',app:'dingdong'},{name:'生抽',qty:'1勺',app:'dingdong'}] },
+    { id:'h4', name:'芹菜香干炒肉', steps:'1.猪肉切片加生抽淀粉腌制；2.芹菜去叶切段，香干切片；3.热油炒肉片变色盛出；4.炒香干至微焦；5.加芹菜翻炒；6.倒回肉片加生抽蚝油调味。', video:'https://search.bilibili.com/all?keyword=芹菜香干炒肉', ingredients:[{name:'猪瘦肉',qty:'200g',app:'dingdong'},{name:'芹菜',qty:'200g',app:'dingdong'},{name:'香干',qty:'4块',app:'dingdong'},{name:'生抽',qty:'1勺',app:'dingdong'},{name:'蚝油',qty:'1勺',app:'dingdong'}] },
+    { id:'h5', name:'豆角焖肉', steps:'1.豆角去筋掰段；2.五花肉切片；3.煸炒五花肉出油；4.加豆角翻炒至变色；5.加生抽老抽和少许水；6.盖盖焖10分钟至豆角熟透加盐。', video:'https://search.bilibili.com/all?keyword=豆角焖肉', ingredients:[{name:'豆角',qty:'300g',app:'dingdong'},{name:'五花肉',qty:'200g',app:'dingdong'},{name:'生抽',qty:'1勺',app:'dingdong'},{name:'老抽',qty:'少许',app:'dingdong'},{name:'大蒜',qty:'3瓣',app:'dingdong'}] },
+    { id:'h6', name:'木须肉', steps:'1.猪肉切片加生抽淀粉腌制；2.鸡蛋打散炒熟盛出；3.炒肉片变色盛出；4.炒木耳黄花菜黄瓜片；5.倒回肉和蛋加生抽盐翻炒。', video:'https://search.bilibili.com/all?keyword=木须肉', ingredients:[{name:'猪瘦肉',qty:'200g',app:'dingdong'},{name:'鸡蛋',qty:'2个',app:'dingdong'},{name:'干木耳',qty:'20g',app:'dingdong'},{name:'黄瓜',qty:'1根',app:'dingdong'},{name:'黄花菜',qty:'20g',app:'dingdong'}] },
+    { id:'h7', name:'蒜苔炒肉', steps:'1.猪肉切丝加生抽淀粉腌制；2.蒜苔切段；3.热油炒肉丝变色盛出；4.炒蒜苔至断生；5.倒回肉丝加生抽盐翻炒。', video:'https://search.bilibili.com/all?keyword=蒜苔炒肉', ingredients:[{name:'猪瘦肉',qty:'200g',app:'dingdong'},{name:'蒜苔',qty:'250g',app:'dingdong'},{name:'生抽',qty:'1勺',app:'dingdong'},{name:'淀粉',qty:'适量',app:'dingdong'}] },
+    { id:'h8', name:'韭菜炒蛋', steps:'1.鸡蛋打散加盐；2.韭菜洗净切段；3.热油炒鸡蛋凝固盛出；4.大火快炒韭菜30秒；5.倒回鸡蛋翻炒加盐。', video:'https://search.bilibili.com/all?keyword=韭菜炒蛋', ingredients:[{name:'韭菜',qty:'200g',app:'dingdong'},{name:'鸡蛋',qty:'4个',app:'dingdong'}] },
+    { id:'h9', name:'洋葱炒肉', steps:'1.猪肉切片加生抽淀粉腌制；2.洋葱切丝；3.热油炒肉片变色盛出；4.炒洋葱至透明出香；5.倒回肉片加生抽蚝油翻炒。', video:'https://search.bilibili.com/all?keyword=洋葱炒肉', ingredients:[{name:'猪瘦肉',qty:'200g',app:'dingdong'},{name:'洋葱',qty:'1个',app:'dingdong'},{name:'生抽',qty:'1勺',app:'dingdong'},{name:'蚝油',qty:'1勺',app:'dingdong'}] },
+    { id:'h10', name:'西葫芦炒鸡蛋', steps:'1.鸡蛋打散炒熟盛出；2.西葫芦切片；3.热油炒西葫芦至半透明；4.倒回鸡蛋翻炒加盐。', video:'https://search.bilibili.com/all?keyword=西葫芦炒鸡蛋', ingredients:[{name:'西葫芦',qty:'1根',app:'dingdong'},{name:'鸡蛋',qty:'3个',app:'dingdong'},{name:'大蒜',qty:'2瓣',app:'dingdong'}] },
+  ],
+  vegetable: [
+    { id:'v1', name:'蒜蓉西兰花', steps:'1.西兰花掰小朵焯水1分钟过凉；2.蒜切末；3.热油炒香蒜末；4.下西兰花大火翻炒；5.加蚝油和盐调味。', video:'https://search.bilibili.com/all?keyword=蒜蓉西兰花', ingredients:[{name:'西兰花',qty:'1颗',app:'dingdong'},{name:'大蒜',qty:'5瓣',app:'dingdong'},{name:'蚝油',qty:'1勺',app:'dingdong'}] },
+    { id:'v2', name:'酸辣土豆丝', steps:'1.土豆去皮切细丝泡水去淀粉；2.干辣椒剪段，备花椒；3.热油爆香干辣椒花椒；4.下沥干的土豆丝大火快炒；5.加醋和盐翻炒出锅。', video:'https://search.bilibili.com/all?keyword=酸辣土豆丝', ingredients:[{name:'土豆',qty:'2个',app:'dingdong'},{name:'干辣椒',qty:'5个',app:'dingdong'},{name:'花椒',qty:'少许',app:'dingdong'},{name:'香醋',qty:'1勺',app:'dingdong'}] },
+    { id:'v3', name:'麻婆豆腐', steps:'1.豆腐切块焯水去腥；2.炒肉末至变色加豆瓣酱炒出红油；3.加水煮开下豆腐；4.小火煮5分钟入味；5.水淀粉勾芡；6.撒花椒粉和葱花。', video:'https://search.bilibili.com/all?keyword=麻婆豆腐', ingredients:[{name:'嫩豆腐',qty:'1盒',app:'dingdong'},{name:'猪肉末',qty:'100g',app:'dingdong'},{name:'郫县豆瓣酱',qty:'1勺',app:'dingdong'},{name:'花椒粉',qty:'少许',app:'dingdong'},{name:'小葱',qty:'1根',app:'dingdong'},{name:'淀粉',qty:'适量',app:'dingdong'}] },
+    { id:'v4', name:'地三鲜', steps:'1.土豆茄子青椒切滚刀块；2.土豆茄子分别过油至金黄；3.调汁（生抽老抽醋糖淀粉水）；4.热油炒香蒜末；5.所有食材入锅淋汁翻炒。', video:'https://search.bilibili.com/all?keyword=地三鲜', ingredients:[{name:'土豆',qty:'2个',app:'dingdong'},{name:'茄子',qty:'1根',app:'dingdong'},{name:'青椒',qty:'2个',app:'dingdong'},{name:'大蒜',qty:'3瓣',app:'dingdong'},{name:'生抽',qty:'1勺',app:'dingdong'},{name:'老抽',qty:'少许',app:'dingdong'}] },
+    { id:'v5', name:'手撕包菜', steps:'1.包菜手撕成片；2.干辣椒剪段，五花肉切薄片（可选）；3.煸炒五花肉出油加干辣椒蒜片；4.下包菜大火爆炒；5.加生抽醋糖盐快速翻炒。', video:'https://search.bilibili.com/all?keyword=手撕包菜', ingredients:[{name:'包菜',qty:'半颗',app:'dingdong'},{name:'干辣椒',qty:'5个',app:'dingdong'},{name:'大蒜',qty:'3瓣',app:'dingdong'},{name:'生抽',qty:'1勺',app:'dingdong'},{name:'香醋',qty:'1勺',app:'dingdong'}] },
+    { id:'v6', name:'清炒时蔬', steps:'1.时令绿叶菜（空心菜/菠菜/小青菜）洗净；2.蒜切片；3.热油爆香蒜片；4.下蔬菜大火快炒；5.变软后加盐调味立刻出锅。', video:'https://search.bilibili.com/all?keyword=清炒时蔬', ingredients:[{name:'时令绿叶菜',qty:'300g',app:'dingdong'},{name:'大蒜',qty:'3瓣',app:'dingdong'}] },
+    { id:'v7', name:'家常豆腐', steps:'1.老豆腐切三角片煎至两面金黄盛出；2.炒肉末至变色加豆瓣酱；3.加木耳青椒片翻炒；4.放入豆腐加生抽少许水焖2分钟；5.水淀粉勾芡。', video:'https://search.bilibili.com/all?keyword=家常豆腐', ingredients:[{name:'老豆腐',qty:'1块',app:'dingdong'},{name:'猪肉末',qty:'100g',app:'dingdong'},{name:'青椒',qty:'1个',app:'dingdong'},{name:'干木耳',qty:'15g',app:'dingdong'},{name:'郫县豆瓣酱',qty:'1勺',app:'dingdong'}] },
+    { id:'v8', name:'干煸四季豆', steps:'1.四季豆去筋掰段沥干水分；2.多油煸炒四季豆至表面起皱盛出；3.留底油炒香肉末干辣椒花椒蒜末；4.倒回四季豆加生抽盐翻炒。', video:'https://search.bilibili.com/all?keyword=干煸四季豆', ingredients:[{name:'四季豆',qty:'300g',app:'dingdong'},{name:'猪肉末',qty:'100g',app:'dingdong'},{name:'干辣椒',qty:'5个',app:'dingdong'},{name:'花椒',qty:'少许',app:'dingdong'},{name:'大蒜',qty:'4瓣',app:'dingdong'}] },
+    { id:'v9', name:'蚝油生菜', steps:'1.生菜掰开洗净；2.水开加盐油焯生菜10秒捞出摆盘；3.蒜切末；4.热油炒香蒜末加蚝油生抽水煮开；5.淋在生菜上。', video:'https://search.bilibili.com/all?keyword=蚝油生菜', ingredients:[{name:'生菜',qty:'2颗',app:'dingdong'},{name:'大蒜',qty:'5瓣',app:'dingdong'},{name:'蚝油',qty:'2勺',app:'dingdong'},{name:'生抽',qty:'1勺',app:'dingdong'}] },
+    { id:'v10', name:'凉拌黄瓜', steps:'1.黄瓜拍碎切段；2.蒜切末加盐糖醋生抽辣椒油调汁；3.浇在黄瓜上拌匀；4.冷藏10分钟更入味。', video:'https://search.bilibili.com/all?keyword=凉拌黄瓜', ingredients:[{name:'黄瓜',qty:'2根',app:'dingdong'},{name:'大蒜',qty:'3瓣',app:'dingdong'},{name:'香醋',qty:'1勺',app:'dingdong'},{name:'生抽',qty:'1勺',app:'dingdong'},{name:'辣椒油',qty:'适量',app:'dingdong'}] },
+  ],
+  soup: [
+    { id:'s1', name:'紫菜蛋花汤', steps:'1.紫菜撕碎放入大碗；2.水烧开转小火淋入蛋液；3.加盐鸡精虾皮；4.将汤冲入放紫菜的碗中；5.滴香油撒葱花。', video:'https://search.bilibili.com/all?keyword=紫菜蛋花汤', ingredients:[{name:'紫菜',qty:'1张',app:'dingdong'},{name:'鸡蛋',qty:'2个',app:'dingdong'},{name:'虾皮',qty:'少许',app:'dingdong'},{name:'小葱',qty:'1根',app:'dingdong'},{name:'香油',qty:'少许',app:'dingdong'}] },
+    { id:'s2', name:'番茄蛋汤', steps:'1.番茄切块炒出汁；2.加水煮开；3.转小火淋入蛋液；4.加盐调味撒葱花。', video:'https://search.bilibili.com/all?keyword=番茄蛋汤', ingredients:[{name:'西红柿',qty:'2个',app:'dingdong'},{name:'鸡蛋',qty:'2个',app:'dingdong'},{name:'小葱',qty:'1根',app:'dingdong'}] },
+    { id:'s3', name:'玉米排骨汤', steps:'1.排骨焯水洗净；2.玉米切段，胡萝卜切滚刀块；3.排骨姜片入锅加水大火煮开转小火炖40分钟；4.加玉米胡萝卜再炖20分钟；5.加盐调味。', video:'https://search.bilibili.com/all?keyword=玉米排骨汤', ingredients:[{name:'排骨',qty:'400g',app:'dingdong'},{name:'甜玉米',qty:'2根',app:'dingdong'},{name:'胡萝卜',qty:'1根',app:'dingdong'},{name:'姜',qty:'3片',app:'dingdong'}] },
+    { id:'s4', name:'冬瓜排骨汤', steps:'1.排骨焯水洗净；2.冬瓜去皮切块；3.排骨姜片入锅加水大火煮开转小火炖40分钟；4.加冬瓜再炖15分钟；5.加盐撒枸杞葱花。', video:'https://search.bilibili.com/all?keyword=冬瓜排骨汤', ingredients:[{name:'排骨',qty:'400g',app:'dingdong'},{name:'冬瓜',qty:'500g',app:'dingdong'},{name:'姜',qty:'3片',app:'dingdong'},{name:'枸杞',qty:'少许',app:'dingdong'},{name:'小葱',qty:'1根',app:'dingdong'}] },
+    { id:'s5', name:'菌菇豆腐汤', steps:'1.各种菌菇（香菇金针菇杏鲍菇）切片；2.嫩豆腐切块；3.热油炒香菌菇；4.加水煮开下豆腐；5.煮5分钟加盐白胡椒粉撒葱花。', video:'https://search.bilibili.com/all?keyword=菌菇豆腐汤', ingredients:[{name:'香菇',qty:'5朵',app:'dingdong'},{name:'金针菇',qty:'1把',app:'dingdong'},{name:'嫩豆腐',qty:'1盒',app:'dingdong'},{name:'白胡椒粉',qty:'少许',app:'dingdong'},{name:'小葱',qty:'1根',app:'dingdong'}] },
+    { id:'s6', name:'萝卜排骨汤', steps:'1.排骨焯水洗净；2.白萝卜去皮切滚刀块；3.排骨姜片加水大火煮开转小火炖40分钟；4.加白萝卜再炖20分钟；5.加盐撒葱花。', video:'https://search.bilibili.com/all?keyword=萝卜排骨汤', ingredients:[{name:'排骨',qty:'400g',app:'dingdong'},{name:'白萝卜',qty:'1根',app:'dingdong'},{name:'姜',qty:'3片',app:'dingdong'},{name:'小葱',qty:'1根',app:'dingdong'}] },
+    { id:'s7', name:'酸辣汤', steps:'1.豆腐木耳冬笋切丝；2.肉丝加淀粉腌制滑炒；3.水烧开下所有食材；4.加生抽醋白胡椒粉盐；5.水淀粉勾芡淋蛋液；6.滴香油。', video:'https://search.bilibili.com/all?keyword=酸辣汤', ingredients:[{name:'嫩豆腐',qty:'1盒',app:'dingdong'},{name:'猪瘦肉',qty:'100g',app:'dingdong'},{name:'干木耳',qty:'10g',app:'dingdong'},{name:'鸡蛋',qty:'1个',app:'dingdong'},{name:'香醋',qty:'2勺',app:'dingdong'},{name:'白胡椒粉',qty:'1勺',app:'dingdong'},{name:'香油',qty:'少许',app:'dingdong'}] },
+    { id:'s8', name:'菠菜猪肝汤', steps:'1.猪肝切片泡水去血水，加姜片料酒淀粉腌制；2.菠菜焯水去草酸捞出；3.水开下姜片枸杞；4.滑入猪肝煮至变色；5.加菠菜煮30秒加盐香油。', video:'https://search.bilibili.com/all?keyword=菠菜猪肝汤', ingredients:[{name:'猪肝',qty:'200g',app:'dingdong'},{name:'菠菜',qty:'200g',app:'dingdong'},{name:'姜',qty:'5片',app:'dingdong'},{name:'枸杞',qty:'少许',app:'dingdong'},{name:'料酒',qty:'1勺',app:'dingdong'},{name:'香油',qty:'少许',app:'dingdong'}] },
+  ]
+};
+
+// ============ STATE ============
+const STORAGE_KEY = 'dinner_planner_state';
+const RECENT_DAYS = 14;
+const LIKED_COOLDOWN = 7;
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (!s.customDishes) s.customDishes = { meat:[], halfMeat:[], vegetable:[], soup:[] };
+      return s;
+    }
+  } catch(e) {}
+  return { liked:{}, disliked:{}, history:{}, menu:{}, customDishes:{ meat:[], halfMeat:[], vegetable:[], soup:[] } };
+}
+
+function allDishes() {
+  const merged = {};
+  for (const cat of ['meat','halfMeat','vegetable','soup']) {
+    merged[cat] = [...DISHES[cat], ...(state.customDishes[cat] || [])];
+  }
+  return merged;
+}
+
+function saveState(s) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+}
+
+let state = loadState();
+
+// ============ HELPERS ============
+function dateKey(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+
+function getMonday(d) {
+  const m = new Date(d);
+  const day = m.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  m.setDate(m.getDate() + diff);
+  m.setHours(0,0,0,0);
+  return m;
+}
+
+function isEatOutDay(d) {
+  const dow = d.getDay();
+  return dow === 3 || dow === 6;
+}
+
+function formatDate(d) {
+  return `${d.getMonth()+1}/${d.getDate()}`;
+}
+
+function getDOW(d) {
+  return ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()];
+}
+
+// ============ MENU GENERATION ============
+function getAllAvailable(cat) {
+  return allDishes()[cat].filter(d => !state.disliked[d.id]);
+}
+
+function getRecentlyUsed() {
+  const now = Date.now();
+  const cutoff = now - RECENT_DAYS * 24 * 3600 * 1000;
+  const recent = new Set();
+  Object.entries(state.history).forEach(([id, ts]) => {
+    if (ts > cutoff) recent.add(id);
+  });
+  return recent;
+}
+
+function getLikedOnCooldown() {
+  // Liked dishes that were used too recently to reuse
+  const now = Date.now();
+  const cutoff = now - LIKED_COOLDOWN * 24 * 3600 * 1000;
+  const onCooldown = new Set();
+  Object.entries(state.liked).forEach(([id, ts]) => {
+    if (ts > cutoff) onCooldown.add(id);
+  });
+  return onCooldown;
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function pickDayMenu(usedThisWeek) {
+  const recent = getRecentlyUsed();
+
+  const filterAvailable = (cat) => shuffle(getAllAvailable(cat).filter(d => !usedThisWeek.has(d.id) && !recent.has(d.id)));
+
+  let availMeat = filterAvailable('meat');
+  let availHalf = filterAvailable('halfMeat');
+  let availVeg = filterAvailable('vegetable');
+  let availSoup = filterAvailable('soup');
+
+  const pickRelaxed = (cat, pool) => {
+    if (pool.length > 0) return pool[0];
+    const relaxed = shuffle(getAllAvailable(cat).filter(d => !usedThisWeek.has(d.id)));
+    if (relaxed.length > 0) return relaxed[0];
+    return allDishes()[cat][0];
+  };
+
+  const meat = pickRelaxed('meat', availMeat);
+  usedThisWeek.add(meat.id);
+
+  let dish2;
+  if (availHalf.length > 0 && Math.random() > 0.3) {
+    dish2 = availHalf[0];
+  } else {
+    const otherMeat = availMeat.filter(d => d.id !== meat.id);
+    if (otherMeat.length > 0) {
+      dish2 = otherMeat[0];
+    } else {
+      dish2 = pickRelaxed('halfMeat', availHalf);
+    }
+  }
+  usedThisWeek.add(dish2.id);
+
+  const veg = pickRelaxed('vegetable', availVeg);
+  usedThisWeek.add(veg.id);
+
+  const soup = pickRelaxed('soup', availSoup);
+  usedThisWeek.add(soup.id);
+
+  return { dishes: [meat, dish2, veg], soup };
+}
+
+function generateWeekMenu(monday) {
+  const usedThisWeek = new Set();
+  const menu = {};
+
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(monday);
+    day.setDate(monday.getDate() + i);
+    const key = dateKey(day);
+
+    if (isEatOutDay(day)) {
+      menu[key] = { eatOut: true };
+    } else {
+      menu[key] = pickDayMenu(usedThisWeek);
+    }
+  }
+
+  return menu;
+}
+
+function getMenuForDate(d) {
+  const monday = getMonday(d);
+  const weekKey = dateKey(monday);
+
+  if (!state.menu[weekKey]) {
+    state.menu[weekKey] = generateWeekMenu(monday);
+    const keys = Object.keys(state.menu).sort();
+    while (keys.length > 4) delete state.menu[keys.shift()];
+    saveState(state);
+  }
+
+  return state.menu[weekKey][dateKey(d)] || { eatOut: true };
+}
+
+// ============ RENDER ============
+const today = new Date();
+let currentMonday = getMonday(today);
+let selectedDate = new Date(today);
+
+function renderWeekNav() {
+  const nav = document.getElementById('weekNav');
+  const label = document.getElementById('weekLabel');
+  const sun = new Date(currentMonday);
+  sun.setDate(currentMonday.getDate() + 6);
+
+  label.textContent = `${currentMonday.getFullYear()}年${currentMonday.getMonth()+1}月${currentMonday.getDate()}日 - ${sun.getMonth()+1}月${sun.getDate()}日`;
+
+  let html = '';
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(currentMonday);
+    d.setDate(currentMonday.getDate() + i);
+    const key = dateKey(d);
+    const isToday = key === dateKey(today);
+    const isSel = key === dateKey(selectedDate);
+    const eatOut = isEatOutDay(d);
+    let cls = 'day';
+    if (isSel) cls += ' active';
+    if (isToday) cls += ' today';
+    if (eatOut) cls += ' eatout';
+    html += `<div class="${cls}" data-date="${key}">
+      <div class="dow">${getDOW(d)}</div>
+      <div class="date">${formatDate(d)}</div>
+      <div class="label">${eatOut ? '外出就餐' : '家庭晚餐'}</div>
+    </div>`;
+  }
+  nav.innerHTML = html;
+
+  nav.querySelectorAll('.day').forEach(el => {
+    el.addEventListener('click', () => {
+      selectedDate = new Date(el.dataset.date + 'T00:00:00');
+      renderDayDetail();
+      renderShoppingList();
+      renderWeekNav();
+    });
+  });
+}
+
+function regenerateDay(d) {
+  const monday = getMonday(d);
+  const weekKey = dateKey(monday);
+  if (!state.menu[weekKey]) return;
+
+  // Rebuild usedThisWeek excluding this day's dishes
+  const usedThisWeek = new Set();
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(monday);
+    day.setDate(monday.getDate() + i);
+    const key = dateKey(day);
+    if (key === dateKey(d)) continue;
+    const m = state.menu[weekKey][key];
+    if (m && !m.eatOut) {
+      m.dishes.forEach(dish => usedThisWeek.add(dish.id));
+      usedThisWeek.add(m.soup.id);
+    }
+  }
+
+  if (isEatOutDay(d)) {
+    state.menu[weekKey][dateKey(d)] = { eatOut: true };
+  } else {
+    state.menu[weekKey][dateKey(d)] = pickDayMenu(usedThisWeek);
+  }
+  saveState(state);
+}
+
+function renderDayDetail() {
+  const container = document.getElementById('dayDetail');
+  const key = dateKey(selectedDate);
+  const menu = getMenuForDate(selectedDate);
+  const isToday = key === dateKey(today);
+
+  if (menu.eatOut) {
+    container.innerHTML = `<div class="eatout-card">
+      <div class="icon">🍽️</div>
+      <p>今天是${getDOW(selectedDate)}，外出就餐日～</p>
+      <p style="font-size:12px;margin-top:4px">不用做饭，享受美食吧！</p>
+    </div>`;
+    return;
+  }
+
+  const catLabel = { meat: '荤菜', half: '半荤半素', veg: '素菜', soup: '汤' };
+  const catKeyToCSS = { meat:'meat', halfMeat:'half', vegetable:'veg', soup:'soup' };
+  const allDishes = [...menu.dishes, menu.soup];
+
+  const owner = MODE === 'owner';
+  let html = `<div class="day-header">
+    <h2>${isToday ? '🍽️ 今晚菜谱' : '📋 当日菜谱'} ${isToday ? '<span class="badge">今天</span>' : ''}</h2>
+    ${owner ? '<button class="btn-refresh" id="btnRegenerate">🔄 换一批菜</button><button class="btn-refresh" id="btnAddDish">＋ 加个菜</button>' : ''}
+  </div>`;
+
+  allDishes.forEach((d, idx) => {
+    const catKey = idx < menu.dishes.length ? findDishCat(d.id) : 'soup';
+    const cat = catKeyToCSS[catKey] || 'meat';
+    const isLiked = state.liked[d.id];
+    const isDisliked = state.disliked[d.id];
+
+    html += `<div class="dish-card">
+      <div style="flex:1">
+        <span class="cat-tag ${cat}">${catLabel[cat]}</span>
+        <h3>${d.name}</h3>
+        <div class="steps">${d.steps}</div>
+        ${d.video ? `<a class="video-link" href="${d.video}" target="_blank" rel="noopener">▶ 搜索视频教程</a>` : ''}
+        ${owner ? `<div class="actions">
+          <button class="btn-like ${isLiked ? 'liked' : ''}" data-id="${d.id}" data-action="like">
+            ${isLiked ? '❤️ 已喜欢' : '🤍 喜欢'}
+          </button>
+          <button class="btn-dislike ${isDisliked ? 'disliked' : ''}" data-id="${d.id}" data-action="dislike">
+            ${isDisliked ? '👎 已不喜欢' : '👎 不喜欢'}
+          </button>
+          <button class="btn-swap" data-id="${d.id}" data-action="swap">
+            🔄 换一个
+          </button>
+        </div>` : ''}
+      </div>
+    </div>`;
+  });
+
+  container.innerHTML = html;
+
+  container.querySelectorAll('button[data-action]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.action === 'swap') {
+        handleSwap(btn.dataset.id);
+      } else {
+        handlePreference(btn.dataset.id, btn.dataset.action);
+      }
+    });
+  });
+
+  const regenBtn = document.getElementById('btnRegenerate');
+  if (regenBtn) {
+    regenBtn.addEventListener('click', () => {
+      regenerateDay(selectedDate);
+      renderDayDetail();
+      renderShoppingList();
+    });
+  }
+
+  const addBtn = document.getElementById('btnAddDish');
+  if (addBtn) {
+    addBtn.addEventListener('click', openAddDishModal);
+  }
+}
+
+function handlePreference(id, action) {
+  if (action === 'like') {
+    if (state.liked[id]) {
+      delete state.liked[id];
+    } else {
+      state.liked[id] = Date.now();
+      delete state.disliked[id];
+    }
+  } else {
+    if (state.disliked[id]) {
+      delete state.disliked[id];
+    } else {
+      state.disliked[id] = Date.now();
+      delete state.liked[id];
+    }
+  }
+
+  state.history[id] = Date.now();
+  const weekKey = dateKey(getMonday(today));
+  delete state.menu[weekKey];
+
+  // Reset selectedDate to today so the regenerated menu shows
+  selectedDate = new Date(today);
+  currentMonday = getMonday(today);
+
+  saveState(state);
+  renderAll();
+}
+
+function handleSwap(dishId) {
+  const cat = findDishCat(dishId);
+  if (!cat) return;
+
+  const monday = getMonday(selectedDate);
+  const weekKey = dateKey(monday);
+  if (!state.menu[weekKey]) return;
+
+  const dayMenu = state.menu[weekKey][dateKey(selectedDate)];
+  if (!dayMenu || dayMenu.eatOut) return;
+
+  // Build usedThisWeek excluding the dish being swapped
+  const usedThisWeek = new Set();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const key = dateKey(d);
+    if (key === dateKey(selectedDate)) continue;
+    const m = state.menu[weekKey][key];
+    if (m && !m.eatOut) {
+      m.dishes.forEach(dish => usedThisWeek.add(dish.id));
+      usedThisWeek.add(m.soup.id);
+    }
+  }
+  // Also add other dishes from today (excluding the one being swapped)
+  dayMenu.dishes.forEach(d => { if (d.id !== dishId) usedThisWeek.add(d.id); });
+  if (dayMenu.soup && dayMenu.soup.id !== dishId) usedThisWeek.add(dayMenu.soup.id);
+
+  const recent = getRecentlyUsed();
+  const available = shuffle(getAllAvailable(cat).filter(d =>
+    d.id !== dishId && !usedThisWeek.has(d.id) && !recent.has(d.id)
+  ));
+
+  if (available.length === 0) {
+    alert('没有可替换的菜品了，请先添加新菜或调整偏好');
+    return;
+  }
+
+  const newDish = available[0];
+  if (cat === 'soup') {
+    dayMenu.soup = newDish;
+  } else {
+    const idx = dayMenu.dishes.findIndex(d => d.id === dishId);
+    if (idx >= 0) dayMenu.dishes[idx] = newDish;
+  }
+
+  usedThisWeek.add(newDish.id);
+  state.history[newDish.id] = Date.now();
+  saveState(state);
+  renderDayDetail();
+  renderShoppingList();
+}
+
+// ============ INGREDIENT CLASSIFICATION ============
+// Categorize each ingredient as: 食材 (main), 辅料 (auxiliary), 调味品 (seasoning)
+const SEASONING_SET = new Set([
+  '生抽','老抽','料酒','香醋','陈醋','白醋','白糖','冰糖','蚝油','盐','鸡精','味精',
+  '郫县豆瓣酱','香油','白胡椒粉','花椒粉','辣椒面','椒盐','蒸鱼豉油','辣椒油',
+  '黄豆酱','甜面酱','番茄酱','芝麻酱','老干妈','十三香','五香粉',
+]);
+const AUXILIARY_SET = new Set([
+  '淀粉','干木耳','干香菇','花生米','紫菜','虾皮','枸杞','黄花菜','白芝麻','黑芝麻',
+  '干辣椒','花椒','八角','桂皮','香叶','姜','大蒜','小葱','大葱','蒜苗','香菜',
+  '啤酒','可乐','雪碧',
+]);
+function classifyIngredient(name) {
+  if (SEASONING_SET.has(name)) return 'seasoning';
+  if (AUXILIARY_SET.has(name)) return 'auxiliary';
+  return 'ingredient';
+}
+const CAT_LABELS = { ingredient:'🥩 食材', auxiliary:'📦 辅料', seasoning:'🧂 调味品' };
+
+function renderShoppingList() {
+  const container = document.getElementById('shoppingList');
+  const menu = getMenuForDate(selectedDate);
+
+  if (menu.eatOut) {
+    container.innerHTML = '<h2>🛒 今日采购</h2><div class="no-data">今日外出就餐，无需采购</div>';
+    return;
+  }
+
+  const allDishes = [...menu.dishes, menu.soup];
+  // Aggregate ingredients by name+app+category
+  const agg = {};
+  allDishes.forEach(d => {
+    (d.ingredients || []).forEach(ing => {
+      const cat = classifyIngredient(ing.name);
+      const k = `${ing.name}|${ing.app}|${cat}`;
+      if (!agg[k]) agg[k] = { name:ing.name, app:ing.app, cat, qtys:[] };
+      agg[k].qtys.push(ing.qty);
+    });
+  });
+
+  // Group by app, then by category
+  const groups = {}; // { dingdong: { ingredient:[], auxiliary:[], seasoning:[] }, meituan: {...} }
+  Object.values(agg).forEach(item => {
+    const uniqueQtys = [...new Set(item.qtys)];
+    const qtyStr = uniqueQtys.length === 1 ? uniqueQtys[0] : uniqueQtys.join('/');
+    const entry = { name:item.name, qty:qtyStr };
+    if (!groups[item.app]) groups[item.app] = { ingredient:[], auxiliary:[], seasoning:[] };
+    groups[item.app][item.cat].push(entry);
+  });
+
+  let html = '<h2>🛒 今日食材采购清单</h2>';
+
+  function renderAppSection(appKey, appLabel, appClass) {
+    const g = groups[appKey];
+    if (!g) return '';
+    const cats = ['ingredient','auxiliary','seasoning'];
+    const items = cats.flatMap(c => g[c]);
+    if (items.length === 0) return '';
+
+    let section = `<div class="app-section">
+      <span class="app-title ${appClass}">${appLabel}</span>`;
+
+    cats.forEach(cat => {
+      if (g[cat].length === 0) return;
+      section += `<div class="cat-group">
+        <div class="cat-label">${CAT_LABELS[cat]}</div>
+        <ul>${g[cat].map(i => `<li><span>${i.name}</span><span class="qty">${i.qty}</span></li>`).join('')}</ul>
+      </div>`;
+    });
+
+    section += '</div>';
+    return section;
+  }
+
+  html += renderAppSection('dingdong', '🥬 叮咚买菜', 'dingdong');
+  html += renderAppSection('meituan', '🛵 美团外卖', 'meituan');
+
+  html += '<div class="note">💡 建议优先叮咚买菜购买生鲜食材；调味品饮料可在美团外卖补货。📍 配送至：杭州市拱墅区沁润公寓</div>';
+  container.innerHTML = html;
+}
+
+function renderPrefs() {
+  const container = document.getElementById('prefsSection');
+  if (MODE !== 'owner') { container.innerHTML = ''; return; }
+  let html = '<h2>⚙️ 口味偏好</h2>';
+
+  const likedIds = Object.keys(state.liked);
+  const dislikedIds = Object.keys(state.disliked);
+
+  if (likedIds.length === 0 && dislikedIds.length === 0) {
+    html += '<div class="no-data" style="padding:10px">点击菜谱中的"喜欢"或"不喜欢"来调教口味偏好<br>不喜欢的菜将不再出现，喜欢的菜间隔出现</div>';
+  }
+
+  if (likedIds.length > 0) {
+    html += '<div style="margin-bottom:8px;font-size:13px;color:#2e7d32;">❤️ 喜欢的菜（隔周再次出现）：</div><div class="pref-tags">';
+    likedIds.forEach(id => {
+      const name = findDishName(id);
+      if (name) html += `<span class="pref-tag liked">${name}</span>`;
+    });
+    html += '</div>';
+  }
+
+  if (dislikedIds.length > 0) {
+    html += '<div style="margin:8px 0;font-size:13px;color:#c62828;">👎 不喜欢的菜（已屏蔽）：</div><div class="pref-tags">';
+    dislikedIds.forEach(id => {
+      const name = findDishName(id);
+      if (name) html += `<span class="pref-tag disliked">${name}</span>`;
+    });
+    html += '</div>';
+  }
+
+  if (likedIds.length > 0 || dislikedIds.length > 0) {
+    html += '<button id="resetPrefs" style="margin-top:12px;padding:6px 16px;border:1px solid #ddd;border-radius:14px;background:#fff;cursor:pointer;font-size:12px;color:#999;">重置偏好</button>';
+  }
+
+  container.innerHTML = html;
+
+  const resetBtn = document.getElementById('resetPrefs');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      if (confirm('确定要重置所有口味偏好吗？')) {
+        state.liked = {};
+        state.disliked = {};
+        state.history = {};
+        state.menu = {};
+        saveState(state);
+        selectedDate = new Date(today);
+        currentMonday = getMonday(today);
+        renderAll();
+      }
+    });
+  }
+}
+
+function findDishName(id) {
+  for (const cat of ['meat','halfMeat','vegetable','soup']) {
+    const d = allDishes()[cat].find(x => x.id === id);
+    if (d) return d.name;
+  }
+  return null;
+}
+
+function findDishCat(id) {
+  for (const cat of ['meat','halfMeat','vegetable','soup']) {
+    if (allDishes()[cat].find(x => x.id === id)) return cat;
+  }
+  return null;
+}
+
+function renderAll() {
+  renderWeekNav();
+  renderDayDetail();
+  renderShoppingList();
+  renderPrefs();
+}
+
+// Week navigation
+document.getElementById('btnPrevWeek').addEventListener('click', () => {
+  currentMonday.setDate(currentMonday.getDate() - 7);
+  selectedDate = new Date(currentMonday);
+  renderAll();
+});
+
+document.getElementById('btnNextWeek').addEventListener('click', () => {
+  currentMonday.setDate(currentMonday.getDate() + 7);
+  selectedDate = new Date(currentMonday);
+  renderAll();
+});
+
+// ============ ADD DISH MODAL ============
+let nextCustomId = (() => {
+  let max = 0;
+  for (const cat of ['meat','halfMeat','vegetable','soup']) {
+    (state.customDishes[cat] || []).forEach(d => {
+      const m = d.id.match(/^c(\d+)$/);
+      if (m) max = Math.max(max, parseInt(m[1]));
+    });
+  }
+  return max + 1;
+})();
+
+function openAddDishModal() {
+  document.getElementById('modalTitle').textContent = '＋ 添加新菜';
+  document.getElementById('dishName').value = '';
+  document.getElementById('dishCat').value = 'meat';
+  document.getElementById('dishSteps').value = '';
+  document.getElementById('dishVideo').value = '';
+  document.getElementById('ingredientRows').innerHTML = `
+    <div class="ingredient-row">
+      <input type="text" placeholder="食材名" class="ing-name">
+      <input type="text" placeholder="用量" class="ing-qty" style="width:100px">
+      <select class="ing-app"><option value="dingdong">叮咚</option><option value="meituan">美团</option></select>
+      <button class="btn-remove-ing" onclick="this.parentElement.remove()">✕</button>
+    </div>`;
+  document.getElementById('modalOverlay').classList.add('show');
+}
+
+function closeAddDishModal() {
+  document.getElementById('modalOverlay').classList.remove('show');
+}
+
+function saveNewDish() {
+  const name = document.getElementById('dishName').value.trim();
+  if (!name) { alert('请输入菜品名称'); return; }
+
+  const cat = document.getElementById('dishCat').value;
+  const steps = document.getElementById('dishSteps').value.trim();
+  const video = document.getElementById('dishVideo').value.trim();
+
+  const ingredients = [];
+  document.querySelectorAll('#ingredientRows .ingredient-row').forEach(row => {
+    const ingName = row.querySelector('.ing-name').value.trim();
+    const qty = row.querySelector('.ing-qty').value.trim();
+    const app = row.querySelector('.ing-app').value;
+    if (ingName) {
+      ingredients.push({ name: ingName, qty: qty || '适量', app });
+    }
+  });
+
+  if (ingredients.length === 0) { alert('请至少添加一个食材'); return; }
+
+  const newDish = {
+    id: 'c' + (nextCustomId++),
+    name,
+    steps: steps || '（未填写步骤）',
+    video: video || `https://search.bilibili.com/all?keyword=${encodeURIComponent(name)}`,
+    ingredients
+  };
+
+  if (!state.customDishes[cat]) state.customDishes[cat] = [];
+  state.customDishes[cat].push(newDish);
+
+  // Regenerate current week menu to include the new dish going forward
+  const weekKey = dateKey(getMonday(today));
+  delete state.menu[weekKey];
+  selectedDate = new Date(today);
+  currentMonday = getMonday(today);
+
+  saveState(state);
+  closeAddDishModal();
+  renderAll();
+}
+
+// Modal event listeners
+document.getElementById('btnCancelDish').addEventListener('click', closeAddDishModal);
+document.getElementById('modalOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closeAddDishModal();
+});
+document.getElementById('btnSaveDish').addEventListener('click', saveNewDish);
+document.getElementById('btnAddIng').addEventListener('click', function() {
+  const rows = document.getElementById('ingredientRows');
+  const row = document.createElement('div');
+  row.className = 'ingredient-row';
+  row.innerHTML = `
+    <input type="text" placeholder="食材名" class="ing-name">
+    <input type="text" placeholder="用量" class="ing-qty" style="width:100px">
+    <select class="ing-app"><option value="dingdong">叮咚</option><option value="meituan">美团</option></select>
+    <button class="btn-remove-ing" onclick="this.parentElement.remove()">✕</button>`;
+  rows.appendChild(row);
+});
+
+// ============ INIT ============
+renderAll();
+
+// Register service worker for offline support
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

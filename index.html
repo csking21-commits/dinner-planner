@@ -256,11 +256,14 @@ function loadState() {
     if (raw) {
       const s = JSON.parse(raw);
       if (!s.customDishes) s.customDishes = { meat:[], halfMeat:[], vegetable:[], soup:[] };
+      if (s.version == null) s.version = 0;
       return s;
     }
   } catch(e) {}
-  return { liked:{}, disliked:{}, history:{}, menu:{}, customDishes:{ meat:[], halfMeat:[], vegetable:[], soup:[] } };
+  return { liked:{}, disliked:{}, history:{}, menu:{}, customDishes:{ meat:[], halfMeat:[], vegetable:[], soup:[] }, version: 0 };
 }
+
+function bumpVersion() { state.version = (state.version || 0) + 1; }
 
 function allDishes() {
   const merged = {};
@@ -478,6 +481,7 @@ function regenerateDay(d) {
   } else {
     state.menu[weekKey][dateKey(d)] = pickDayMenu(usedThisWeek);
   }
+  bumpVersion();
   saveState(state);
 }
 
@@ -585,6 +589,7 @@ function handlePreference(id, action) {
   selectedDate = new Date(today);
   currentMonday = getMonday(today);
 
+  bumpVersion();
   saveState(state);
   renderAll();
 }
@@ -637,6 +642,7 @@ function handleSwap(dishId) {
 
   usedThisWeek.add(newDish.id);
   state.history[newDish.id] = Date.now();
+  bumpVersion();
   saveState(state);
   renderDayDetail();
   renderShoppingList();
@@ -767,6 +773,7 @@ function renderPrefs() {
         state.disliked = {};
         state.history = {};
         state.menu = {};
+        bumpVersion();
         saveState(state);
         selectedDate = new Date(today);
         currentMonday = getMonday(today);
@@ -880,6 +887,7 @@ function saveNewDish() {
   selectedDate = new Date(today);
   currentMonday = getMonday(today);
 
+  bumpVersion();
   saveState(state);
   closeAddDishModal();
   renderAll();
@@ -902,6 +910,71 @@ document.getElementById('btnAddIng').addEventListener('click', function() {
     <button class="btn-remove-ing" onclick="this.parentElement.remove()">✕</button>`;
   rows.appendChild(row);
 });
+
+// ============ NOTIFICATIONS (auntie mode) ============
+if (MODE === 'auntie') {
+  let lastSeenVersion = sessionStorage.getItem('dinner_last_seen') ? parseInt(sessionStorage.getItem('dinner_last_seen')) : state.version;
+
+  function checkForUpdates() {
+    const current = loadState().version;
+    if (current > lastSeenVersion) {
+      lastSeenVersion = current;
+      sessionStorage.setItem('dinner_last_seen', current);
+      showUpdateNotification(current);
+    }
+  }
+
+  function showUpdateNotification(ver) {
+    if (Notification.permission === 'granted') {
+      new Notification('🍽️ 菜单已更新', {
+        body: '业主刚刚修改了菜单，刷新页面查看最新菜谱',
+        icon: 'icons/icon-192.png',
+        tag: 'dinner-update'
+      });
+    }
+  }
+
+  // Request notification permission on first load
+  if ('Notification' in window && Notification.permission === 'default') {
+    setTimeout(() => {
+      Notification.requestPermission();
+    }, 3000);
+  }
+
+  // Check on load
+  setTimeout(() => checkForUpdates(), 500);
+
+  // Check periodically every 30 seconds
+  setInterval(checkForUpdates, 30000);
+
+  // Also check when page becomes visible (user switches back to this PWA)
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) checkForUpdates();
+  });
+
+  // Also show a badge in the header if there are updates
+  let badgeInterval = setInterval(() => {
+    const current = loadState().version;
+    const badge = document.getElementById('updateBadge');
+    if (current > lastSeenVersion) {
+      if (!badge) {
+        const h1 = document.querySelector('.header h1');
+        if (h1) {
+          const span = document.createElement('span');
+          span.id = 'updateBadge';
+          span.style.cssText = 'display:inline-block;background:#ffcc02;color:#3e2723;font-size:10px;padding:2px 8px;border-radius:10px;margin-left:8px;animation:pulse 1.5s infinite';
+          span.textContent = '有新菜单';
+          h1.appendChild(span);
+          const style = document.createElement('style');
+          style.textContent = '@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}';
+          document.head.appendChild(style);
+        }
+      }
+    } else {
+      if (badge) badge.remove();
+    }
+  }, 5000);
+}
 
 // ============ INIT ============
 renderAll();
